@@ -1,4 +1,5 @@
 # data/download_protein_clusters.py
+# source /opt/anaconda3/bin/activate
 
 import argparse
 import requests
