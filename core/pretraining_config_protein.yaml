@@ -3,23 +3,23 @@ dataset: QM9
 dataset_download_dir: ./data_loading
 out_path: ./outputs/universal_pretrain
 wandb_project_name: esa-universal-pretraining
-wandb_run_name: universal-QM9-pretraining-clean
+wandb_run_name: universal-PROTEIN-pretraining-clean
 max_epochs: 100
 gradient_clip_val: 0.5
 monitor_loss_name: train_total_loss
 
 num_workers: 4
-molecule_max_atoms: 100
+molecule_max_atoms: 1000  # Proteins typically have more atoms than small molecules
+
 
 # Optimized batch size for node attention
-batch_size: 3072
-
+batch_size: 8
 # Dataset size limit (for testing)
 max_samples: 130000
 
 # Universal representation specific settings
 use_universal_cache: true
-universal_cache_path: "./data_loading/cache/universal_qm9_all.pkl"
+universal_cache_path: "/home/yusuf/MIND/data_loading/cache/universal_pdb_all.pkl"
 
 apply_attention_on: node
 graph_dim: 512
@@ -93,7 +93,6 @@ temperature: 0.1
 lr: 0.0005  # Match working model exactly
 early_stopping_patience: 30
 optimiser_weight_decay: 0.0000000001  # Match working model exactly
-
 
 
 # Memory efficient settings

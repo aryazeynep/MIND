@@ -69,6 +69,7 @@ def load_universal_dataset(config: PretrainingConfig, dataset_name: str, dataset
             root=os.path.join(dataset_dir, 'processed'),
             universal_cache_path=getattr(config, 'universal_cache_path', None),
             max_samples=max_samples,
+            molecule_max_atoms=getattr(config, 'molecule_max_atoms', None),
             cutoff_distance=getattr(config, 'cutoff_distance', 5.0),
             max_neighbors=getattr(config, 'max_neighbors', 32),
             transform=transforms
@@ -85,6 +86,7 @@ def load_universal_dataset(config: PretrainingConfig, dataset_name: str, dataset
             root=os.path.join(dataset_dir, 'processed'),
             universal_cache_path=getattr(config, 'universal_cache_path', None),
             max_samples=max_samples,
+            molecule_max_atoms=getattr(config, 'molecule_max_atoms', None),
             cutoff_distance=getattr(config, 'cutoff_distance', 5.0),
             max_neighbors=getattr(config, 'max_neighbors', 32),
             transform=transforms
