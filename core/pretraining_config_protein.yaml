@@ -9,11 +9,11 @@ gradient_clip_val: 0.5
 monitor_loss_name: train_total_loss
 
 num_workers: 4
-molecule_max_atoms: 1000  # Proteins typically have more atoms than small molecules
+molecule_max_atoms: 2000  # Proteins typically have more atoms than small molecules
 
 
 # Optimized batch size for node attention
-batch_size: 8
+batch_size: 64
 # Dataset size limit (for testing)
 max_samples: 130000
 

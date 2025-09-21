@@ -275,15 +275,14 @@ class OptimizedUniversalDataset(InMemoryDataset):
             return None
     
     def _element_to_atomic_number(self, element: str) -> int:
-        """Convert element symbol to atomic number"""
-        element_to_z = {
-            'H': 1, 'He': 2, 'Li': 3, 'Be': 4, 'B': 5, 'C': 6, 'N': 7, 'O': 8, 
-            'F': 9, 'Ne': 10, 'Na': 11, 'Mg': 12, 'Al': 13, 'Si': 14, 'P': 15, 
-            'S': 16, 'Cl': 17, 'Ar': 18, 'K': 19, 'Ca': 20, 'Sc': 21, 'Ti': 22, 
-            'V': 23, 'Cr': 24, 'Mn': 25, 'Fe': 26, 'Co': 27, 'Ni': 28, 'Cu': 29, 
-            'Zn': 30, 'Ga': 31, 'Ge': 32, 'As': 33, 'Se': 34, 'Br': 35, 'Kr': 36,
-        }
-        return element_to_z.get(element, 6)  # Default to Carbon if unknown
+        """Convert element symbol to atomic number using RDKit only"""
+        try:
+            from rdkit import Chem
+            atomic_num = Chem.GetPeriodicTable().GetAtomicNumber(element)
+            return atomic_num
+        except Exception:
+            # Default to Carbon for any unknown/invalid elements
+            return 6
     
     def _calculate_edge_features(self, positions: torch.Tensor, edge_index: torch.Tensor) -> torch.Tensor:
         """Calculate edge features (distances) between connected atoms"""

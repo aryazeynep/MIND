@@ -94,8 +94,6 @@ lr: 0.0005  # Match working model exactly
 early_stopping_patience: 30
 optimiser_weight_decay: 0.0000000001  # Match working model exactly
 
-
-
 # Memory efficient settings
 use_memory_efficient_attention: true
 attention_dropout: 0.1
