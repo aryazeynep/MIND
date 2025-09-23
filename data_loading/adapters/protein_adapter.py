@@ -57,7 +57,7 @@ class ProteinAdapter(BaseAdapter):
             if suffix == ".pdb":
                 structure = self.pdb_parser.get_structure(id=raw_item.stem, file=str(raw_item))
             elif suffix == ".cif":
-                structure = self.cif_parser.get_structure(id=raw_item.stem, file=str(raw_item))
+                structure = self.cif_parser.get_structure(structure_id=raw_item.stem, file=str(raw_item))
             else:
                 return [] # Desteklenmeyen format
         except Exception as e:

@@ -10,7 +10,7 @@ Usage:
     python data_loading/cache_universal_datasets.py --dataset qm9 --max_samples 1000
 
     # Process the custom PDB dataset from a specific folder of raw structures
-    *CUDA_VISIBLE_DEVICES=0* python data_loading/cache_universal_datasets.py --dataset pdb --data-path ../data/proteins/raw_structures_hq_40k
+    CUDA_VISIBLE_DEVICES=6 python data_loading/cache_universal_datasets.py --dataset pdb --data-path ../data/proteins/raw_structures_hq_40k
 
     # Process the PDB dataset and save the output cache to a custom location
     python data_loading/cache_universal_datasets.py --dataset pdb \
