@@ -5,10 +5,10 @@ python data/protein_pipeline/1_filter_and_create_manifest.py \
     --mode manifest \
     --metadata-file ../data/proteins/afdb_clusters/representatives_metadata.tsv.gz \
     --target-count 40000 \
-    --output ../data/proteins/afdb_clusters/manifest_hq_40k_len384.csv \
+    --output ../data/proteins/afdb_clusters/manifest_hq_40k.csv \
     --existing-structures-dir ../data/proteins/raw_structures_hq_40k \
     --plddt 70 \
-    --max-len 384
+    --max-len 512
 """
 
 """
@@ -148,7 +148,7 @@ def main():
     parser.add_argument("--target-count", type=int, help="'manifest' modu için hedef protein sayısı.")
     parser.add_argument("--output", type=Path, help="'manifest' modu için çıktı CSV dosya yolu.")
     parser.add_argument("--plddt", type=int, default=70, help="Minimum pLDDT eşiği.")
-    parser.add_argument("--max-len", type=int, default=384, help="Maksimum sekans (amino asit) uzunluğu.")
+    parser.add_argument("--max-len", type=int, default=512, help="Maksimum sekans (amino asit) uzunluğu.")
     parser.add_argument(
         "--existing-structures-dir",
         type=Path,

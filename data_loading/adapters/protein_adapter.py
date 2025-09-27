@@ -1,4 +1,5 @@
 # data_loading/adapters/protein_adapter.py
+# source /opt/anaconda3/bin/activate
 
 import sys
 import os
