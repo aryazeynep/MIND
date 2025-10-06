@@ -61,9 +61,25 @@ def get_cache_path(dataset_name: str, cache_dir: Path, max_samples: int = None) 
     
     return cache_dir / cache_file
 
-def cache_dataset(dataset_name: str, data_path: Path, cache_dir: Path, max_samples: int = None, force_rebuild: bool = False):
-    """Cache universal representations for a dataset."""
+def cache_dataset(dataset_name: str, data_path: Path, cache_dir: Path, max_samples: int = None, 
+                  force_rebuild: bool = False, manifest_file: Path = None,
+                  num_chunks: int = None, chunk_index: int = None):
+    """
+    Cache universal representations for a dataset with optional chunking support.
+    
+    Args:
+        dataset_name: Dataset type (qm9, lba, pdb)
+        data_path: Path to raw data directory
+        cache_dir: Directory to save cache files
+        max_samples: Maximum samples to process (optional)
+        force_rebuild: Force rebuild even if cache exists
+        manifest_file: Manifest CSV file (for proteins)
+        num_chunks: Split dataset into N chunks
+        chunk_index: Process only this chunk (0 to num_chunks-1)
+    """
     print(f"🚀 Caching {dataset_name.upper()} dataset...")
+    if num_chunks and chunk_index is not None:
+        print(f"📦 Chunking: Processing chunk {chunk_index + 1}/{num_chunks}")
     print("=" * 60)
     
     adapter, default_data_path = get_adapter(dataset_name)
@@ -77,11 +93,48 @@ def cache_dataset(dataset_name: str, data_path: Path, cache_dir: Path, max_sampl
         print(f"💡 Please provide the correct path using the --data-path argument.")
         return False
     
-    cache_path = get_cache_path(dataset_name, cache_dir, max_samples)
+    # Handle chunking for manifest-based datasets
+    chunk_manifest_file = None
+    if manifest_file and num_chunks and chunk_index is not None:
+        import pandas as pd
+        
+        print(f"📋 Loading manifest for chunking: {manifest_file}")
+        manifest_df = pd.read_csv(manifest_file)
+        total_samples = len(manifest_df)
+        
+        # Calculate chunk boundaries
+        chunk_size = (total_samples + num_chunks - 1) // num_chunks  # Ceiling division
+        start_idx = chunk_index * chunk_size
+        end_idx = min(start_idx + chunk_size, total_samples)
+        
+        # Extract this chunk's rows
+        chunk_df = manifest_df.iloc[start_idx:end_idx]
+        
+        # Save temporary chunk manifest
+        chunk_manifest_file = cache_dir / f"temp_manifest_chunk_{chunk_index}.csv"
+        chunk_manifest_file.parent.mkdir(parents=True, exist_ok=True)
+        chunk_df.to_csv(chunk_manifest_file, index=False)
+        
+        print(f"📋 Chunk manifest: {len(chunk_df):,} samples (rows {start_idx}-{end_idx})")
+        max_samples = len(chunk_df)  # Override max_samples for this chunk
+    
+    # Generate cache path with chunk info
+    if num_chunks and chunk_index is not None:
+        cache_file = f"universal_{dataset_name}_chunk_{chunk_index}.pkl"
+    elif max_samples:
+        cache_file = f"universal_{dataset_name}_{max_samples}.pkl"
+    else:
+        cache_file = f"universal_{dataset_name}_all.pkl"
+    
+    cache_path = cache_dir / cache_file
+    cache_dir.mkdir(parents=True, exist_ok=True)
     
     if cache_path.exists() and not force_rebuild:
         print(f"✅ Cache already exists: {cache_path}")
         print(f"💡 Use --force to rebuild the cache.")
+        # Cleanup temp manifest
+        if chunk_manifest_file and chunk_manifest_file.exists():
+            chunk_manifest_file.unlink()
         return True
     
     start_time = time.time()
@@ -90,8 +143,13 @@ def cache_dataset(dataset_name: str, data_path: Path, cache_dir: Path, max_sampl
         processed_count = adapter.process_dataset(
             data_path=str(data_path),
             cache_path=str(cache_path),
-            max_samples=max_samples
+            max_samples=max_samples,
+            manifest_file=str(chunk_manifest_file) if chunk_manifest_file else (str(manifest_file) if manifest_file else None)
         )
+        
+        # Cleanup temporary chunk manifest
+        if chunk_manifest_file and chunk_manifest_file.exists():
+            chunk_manifest_file.unlink()
         
         end_time = time.time()
         processing_time = end_time - start_time
@@ -109,6 +167,9 @@ def cache_dataset(dataset_name: str, data_path: Path, cache_dir: Path, max_sampl
         print(f"❌ Error processing dataset: {e}")
         import traceback
         traceback.print_exc()
+        # Cleanup temp manifest on error
+        if chunk_manifest_file and chunk_manifest_file.exists():
+            chunk_manifest_file.unlink()
         return False
 
 def list_cached_datasets(cache_dir: Path):
@@ -137,8 +198,6 @@ def main():
     """Main function"""
     parser = argparse.ArgumentParser(description='Cache universal representations for datasets.')
     
-    # --- MODIFICATION 1: Add 'pdb' to the list of choices ---
-    # --- This fixes the 'invalid choice' error. ---
     parser.add_argument(
         '--dataset', 
         type=str, 
@@ -147,8 +206,6 @@ def main():
         help='Dataset to cache.'
     )
     
-    # --- MODIFICATION 2: Add arguments to specify data and cache paths ---
-    # --- This makes the script flexible and reusable. ---
     parser.add_argument(
         '--data-path', 
         type=Path, 
@@ -161,8 +218,27 @@ def main():
         default=Path('./data_loading/cache'),
         help='Directory where the output .pkl cache file will be saved.'
     )
+    parser.add_argument(
+        '--manifest-file',
+        type=Path,
+        default=None,
+        help='Path to manifest CSV file (for proteins, contains repId column)'
+    )
     
-    # --- Existing arguments remain the same ---
+    # NEW: Chunking parameters
+    parser.add_argument(
+        '--num-chunks',
+        type=int,
+        default=None,
+        help='Split dataset into N chunks for parallel processing'
+    )
+    parser.add_argument(
+        '--chunk-index',
+        type=int,
+        default=None,
+        help='Process only this chunk (0 to num-chunks-1)'
+    )
+    
     parser.add_argument(
         '--max-samples', 
         type=int, 
@@ -186,18 +262,29 @@ def main():
         list_cached_datasets(args.cache_dir)
         return 0
     
+    # Validate chunking args
+    if (args.num_chunks is None) != (args.chunk_index is None):
+        print("❌ Error: --num-chunks and --chunk-index must be used together")
+        return 1
+    
+    if args.chunk_index is not None and args.chunk_index >= args.num_chunks:
+        print(f"❌ Error: --chunk-index must be < --num-chunks (got {args.chunk_index} >= {args.num_chunks})")
+        return 1
+    
     # The 'all' option is simplified for now.
     datasets_to_process = ['qm9', 'lba', 'pdb'] if args.dataset == 'all' else [args.dataset]
     
     success_all = True
     for ds_name in datasets_to_process:
-        # --- MODIFICATION 3: Pass the new path arguments to the caching function ---
         success = cache_dataset(
             dataset_name=ds_name,
             data_path=args.data_path,
             cache_dir=args.cache_dir,
             max_samples=args.max_samples,
-            force_rebuild=args.force
+            force_rebuild=args.force,
+            manifest_file=args.manifest_file,
+            num_chunks=args.num_chunks,
+            chunk_index=args.chunk_index
         )
         if not success:
             success_all = False

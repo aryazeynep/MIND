@@ -107,64 +107,52 @@ class OptimizedUniversalDataset(InMemoryDataset):
             shutil.copy2(self.universal_cache_path, raw_path)
 
     def process(self):
+        """
+        Process molecules from .pkl cache and convert to PyG format.
+        
+        MEMORY NOTE: This processes all molecules in one pass.
+        For large datasets (>50K molecules), use external chunking:
+        - Split dataset at manifest level (e.g., 1M → 50 chunks of 20K)
+        - Process each chunk separately using this method
+        - Use LazyUniversalDataset for training (loads chunks on-demand)
+        
+        Recommended chunk sizes for processing:
+        - 10K molecules: ~200MB RAM
+        - 20K molecules: ~400MB RAM  
+        - 50K molecules: ~1GB RAM
+        """
         print(f"🔄 Processing universal representations...")
 
-        # 1. Create a memory-efficient generator to read the .pkl file stream.
+        # 1. Load molecules from .pkl file
         molecule_iterator = load_molecules_iteratively(self.raw_paths[0])
 
-        # 2. If max_samples is set, limit the iterator without loading everything.
+        # 2. Apply max_samples limit if specified
         if self.max_samples is not None:
             molecule_iterator = islice(molecule_iterator, self.max_samples)
 
-        # 3. Process the iterator in chunks, without ever creating a full list in RAM.
-        chunk_size = 10000
-        temp_dir = os.path.join(self.processed_dir, "temp_chunks")
-        os.makedirs(temp_dir, exist_ok=True)
-        temp_files = []
+        # 3. Convert all molecules to PyG Data objects
+        data_list = []
+        for mol in tqdm(molecule_iterator, desc="Converting molecules"):
+            pyg_data = self._create_pyg_data_object(mol)
+            if pyg_data is not None:
+                data_list.append(pyg_data)
 
-        finished = False
-        chunk_index = 0
-        while not finished:
-            # Take a chunk from the iterator
-            chunk_iterator = islice(molecule_iterator, chunk_size)
-            chunk = list(chunk_iterator) # This list is small (max chunk_size)
-
-            if not chunk:
-                finished = True
-                continue
-
-            data_list_chunk = []
-            for mol in tqdm(chunk, desc=f"Converting chunk {chunk_index}"):
-                pyg_data = self._create_pyg_data_object(mol)
-                if pyg_data is not None:
-                    data_list_chunk.append(pyg_data)
-
-            if not data_list_chunk:
-                chunk_index += 1
-                continue
-
-            temp_path = os.path.join(temp_dir, f"part_{chunk_index}.pt")
-            torch.save(data_list_chunk, temp_path)
-            temp_files.append(temp_path)
-            print(f" ... Saved chunk {chunk_index} with {len(data_list_chunk)} molecules.")
-            chunk_index += 1
-
-        # 4. Merge the temporary files.
-        print(f"✅ All chunks processed. Merging {len(temp_files)} temporary files...")
-        all_data_list = []
-        for temp_path in tqdm(temp_files, desc="Merging chunks"):
-            all_data_list.extend(torch.load(temp_path, map_location='cpu'))
-
-        shutil.rmtree(temp_dir)
-        print("✅ Temporary chunk files removed.")
-
-        if not all_data_list:
+        if not data_list:
             raise RuntimeError("No molecules were processed successfully. Check data and filters.")
 
-        # 5. Collate and save the final dataset.
-        data, slices = self.collate(all_data_list)
+        # Memory usage info
+        ram_mb = len(data_list) * 20 / 1024
+        print(f"✅ Converted {len(data_list):,} molecules to PyG format")
+        print(f"💾 Estimated RAM usage: ~{ram_mb:.0f}MB")
+        
+        if ram_mb > 2000:
+            print(f"⚠️  Large dataset! Consider using smaller chunks for 1M+ proteins.")
+
+        # 4. Collate and save the final dataset
+        print(f"🔄 Collating dataset...")
+        data, slices = self.collate(data_list)
         torch.save((data, slices), self.processed_paths[0])
-        print(f"✅ Processing complete! Saved {len(all_data_list)} molecules to: {self.processed_paths[0]}")
+        print(f"✅ Processing complete! Saved to: {self.processed_paths[0]}")
 
     def _create_pyg_data_object(self, mol: UniversalMolecule) -> Optional[Data]:
         """Helper function to filter and convert a single UniversalMolecule."""
@@ -306,21 +294,56 @@ class OptimizedUniversalLBADataset(OptimizedUniversalDataset):
 
 if __name__ == "__main__":
     import argparse
+    import sys
 
-    parser = argparse.ArgumentParser(description="Create universal datasets")
-    parser.add_argument("--dataset", choices=["qm9", "lba"], required=True, help="Dataset type")
-    parser.add_argument("--root", default=None, help="Root directory for dataset")
+    parser = argparse.ArgumentParser(description="Convert universal .pkl cache to PyG .pt format")
+    parser.add_argument("--input-pkl", required=True, help="Path to input .pkl file")
+    parser.add_argument("--output-dir", required=True, help="Output directory for .pt file")
+    parser.add_argument("--dataset-type", choices=["qm9", "lba", "pdb"], required=True, help="Dataset type")
     parser.add_argument("--max-samples", type=int, default=None, help="Maximum samples to process")
-    parser.add_argument("--cutoff-distance", type=float, default=5.0, help="Distance cutoff for edges")
-    parser.add_argument("--max-neighbors", type=int, default=32, help="Maximum neighbors per atom")
+    parser.add_argument("--cutoff", type=float, default=5.0, help="Distance cutoff for edges (Å)")
+    parser.add_argument("--max-neighbors", type=int, default=64, help="Maximum neighbors per atom")
+    parser.add_argument("--force", action="store_true", help="Force rebuild if output exists")
 
     args = parser.parse_args()
 
-    if args.dataset == "qm9":
-        root_dir = args.root or "./data/optimized_universal_qm9"
-        dataset = OptimizedUniversalQM9Dataset(root=root_dir, max_samples=args.max_samples)
+    # Create output directory
+    os.makedirs(args.output_dir, exist_ok=True)
+
+    # Check if output already exists (look for any .pt file in processed subdir)
+    processed_dir = os.path.join(args.output_dir, "processed")
+    if os.path.exists(processed_dir) and not args.force:
+        pt_files = [f for f in os.listdir(processed_dir) if f.endswith('.pt')]
+        if pt_files:
+            print(f"✅ Output already exists: {os.path.join(processed_dir, pt_files[0])}")
+            print(f"💡 Use --force to rebuild")
+            sys.exit(0)
+
+    # Create dataset based on type
+    if args.dataset_type == "qm9":
+        dataset = OptimizedUniversalQM9Dataset(
+            root=args.output_dir,
+            universal_cache_path=args.input_pkl,
+            max_samples=args.max_samples,
+            cutoff_distance=args.cutoff,
+            max_neighbors=args.max_neighbors
+        )
         print(f"✅ Created QM9 dataset: {len(dataset)} samples")
-    elif args.dataset == "lba":
-        root_dir = args.root or "./data/optimized_universal_lba"
-        dataset = OptimizedUniversalLBADataset(root=root_dir, max_samples=args.max_samples)
+    elif args.dataset_type == "lba":
+        dataset = OptimizedUniversalLBADataset(
+            root=args.output_dir,
+            universal_cache_path=args.input_pkl,
+            max_samples=args.max_samples,
+            cutoff_distance=args.cutoff,
+            max_neighbors=args.max_neighbors
+        )
         print(f"✅ Created LBA dataset: {len(dataset)} samples")
+    elif args.dataset_type == "pdb":
+        dataset = OptimizedUniversalDataset(
+            root=args.output_dir,
+            universal_cache_path=args.input_pkl,
+            max_samples=args.max_samples,
+            cutoff_distance=args.cutoff,
+            max_neighbors=args.max_neighbors
+        )
+        print(f"✅ Created PDB dataset: {len(dataset)} samples")

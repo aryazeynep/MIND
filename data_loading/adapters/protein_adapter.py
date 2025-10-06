@@ -29,22 +29,83 @@ class ProteinAdapter(BaseAdapter):
         self.pdb_parser = PDBParser(QUIET=True)
         self.cif_parser = MMCIFParser(QUIET=True)
 
-    def load_raw_data(self, data_path: str, max_samples: int = None) -> List[Path]:
+    def load_raw_data(self, data_path: str, max_samples: int = None, manifest_file: str = None) -> List[Path]:
         """
-        Scans a directory for all .pdb and .cif files and returns a list of their paths.
+        Load protein structure files, optionally filtering by manifest file.
+        
+        Args:
+            data_path: Directory containing .pdb/.cif files
+            max_samples: Limit number of files (applied after manifest filtering)
+            manifest_file: Optional CSV file with 'repId' column for filtering
+            
+        Returns:
+            List of Path objects to protein structure files
         """
         print(f"Scanning protein structures: {data_path}")
         if not Path(data_path).is_dir():
             raise FileNotFoundError(f"Specified data_path is not a directory: {data_path}")
 
-        files = sorted(list(Path(data_path).glob("*.pdb")))
-        files.extend(sorted(list(Path(data_path).glob("*.cif"))))
-
-        if not files:
-            raise FileNotFoundError(f"No .pdb or .cif files found in directory: {data_path}")
-
-        print(f"Found {len(files):,} structure files in total.")
+        # If manifest provided, use it to filter specific files
+        if manifest_file:
+            import pandas as pd
+            print(f"📋 Loading manifest: {manifest_file}")
+            
+            try:
+                manifest_df = pd.read_csv(manifest_file)
+            except Exception as e:
+                raise ValueError(f"Failed to load manifest file: {e}")
+            
+            if 'repId' not in manifest_df.columns:
+                raise ValueError(f"Manifest file must have 'repId' column, found: {manifest_df.columns.tolist()}")
+            
+            # Extract protein IDs
+            protein_ids = manifest_df['repId'].tolist()
+            print(f"📋 Manifest contains {len(protein_ids):,} protein IDs")
+            
+            # Build file paths based on manifest (AlphaFold naming convention)
+            files = []
+            missing_files = []
+            
+            for protein_id in protein_ids:
+                # Try both .pdb and .cif extensions with AlphaFold naming
+                pdb_path = Path(data_path) / f"AF-{protein_id}-F1-model_v4.pdb"
+                cif_path = Path(data_path) / f"AF-{protein_id}-F1-model_v4.cif"
+                
+                # Also try direct filename match
+                direct_pdb = Path(data_path) / f"{protein_id}.pdb"
+                direct_cif = Path(data_path) / f"{protein_id}.cif"
+                
+                if pdb_path.exists():
+                    files.append(pdb_path)
+                elif cif_path.exists():
+                    files.append(cif_path)
+                elif direct_pdb.exists():
+                    files.append(direct_pdb)
+                elif direct_cif.exists():
+                    files.append(direct_cif)
+                else:
+                    missing_files.append(protein_id)
+            
+            if missing_files:
+                print(f"⚠️  {len(missing_files):,} files not found (will be skipped)")
+                if len(missing_files) <= 5:
+                    print(f"   Missing: {missing_files}")
+                else:
+                    print(f"   First 5 missing: {missing_files[:5]}")
+            
+            print(f"✅ Found {len(files):,}/{len(protein_ids):,} files from manifest")
+            
+        else:
+            # Original behavior: scan directory
+            files = sorted(list(Path(data_path).glob("*.pdb")))
+            files.extend(sorted(list(Path(data_path).glob("*.cif"))))
+            
+            if not files:
+                raise FileNotFoundError(f"No .pdb or .cif files found in directory: {data_path}")
+            
+            print(f"Found {len(files):,} structure files in total.")
         
+        # Apply max_samples limit
         if max_samples:
             print(f"Processing limited to {max_samples:,} samples.")
             return files[:max_samples]

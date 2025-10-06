@@ -54,61 +54,110 @@ def create_pretraining_data_transforms(config: PretrainingConfig):
 
 
 def load_universal_dataset(config: PretrainingConfig, dataset_name: str, dataset_dir: str):
-    """Load universal dataset with optimized caching"""
+    """
+    Load universal dataset with optimized caching.
+    
+    Automatically detects chunked datasets and uses LazyUniversalDataset
+    for memory-efficient loading.
+    """
     print(f"🔄 Loading universal representation dataset: {dataset_name}")
     
     # Create transform
     transforms = create_pretraining_data_transforms(config)
     
-    # Load optimized universal dataset (with efficient tensor caching!)
-    if dataset_name.upper() == 'QM9':
-        # Get max_samples from config
-        max_samples = getattr(config, 'max_samples', 50000)  # Default to 50K for training
-        print(f"📊 Loading {max_samples} samples from universal cache...")
-        
-        full_dataset = OptimizedUniversalQM9Dataset(
-            root=dataset_dir,  # Don't add 'processed' - PyG Dataset will add it
-            universal_cache_path=getattr(config, 'universal_cache_path', None),
-            max_samples=max_samples,
-            molecule_max_atoms=getattr(config, 'molecule_max_atoms', None),
-            cutoff_distance=getattr(config, 'cutoff_distance', 5.0),
-            max_neighbors=getattr(config, 'max_neighbors', 32),
-            transform=transforms
-        )
-        
-    elif dataset_name.upper() == 'LBA':
-        from data_loading.cache_to_pyg import OptimizedUniversalLBADataset
-        
-        # Get max_samples from config
-        max_samples = getattr(config, 'max_samples', 50000)  # Default to 50K for training
-        print(f"📊 Loading {max_samples} samples from universal cache...")
-        
-        full_dataset = OptimizedUniversalLBADataset(
-            root=dataset_dir,  # Don't add 'processed' - PyG Dataset will add it
-            universal_cache_path=getattr(config, 'universal_cache_path', None),
-            max_samples=max_samples,
-            molecule_max_atoms=getattr(config, 'molecule_max_atoms', None),
-            cutoff_distance=getattr(config, 'cutoff_distance', 5.0),
-            max_neighbors=getattr(config, 'max_neighbors', 32),
-            transform=transforms
-        )
-    elif dataset_name.upper() == 'PDB':
-        from data_loading.cache_to_pyg import OptimizedUniversalDataset
-        max_samples = getattr(config, 'max_samples', 50000)  # Default to 50K for training
-        
-        full_dataset = OptimizedUniversalDataset(
-            root=dataset_dir,  # Don't add 'processed' - PyG Dataset will add it
-            universal_cache_path=getattr(config, 'universal_cache_path', None),
-            max_samples=max_samples,
-            molecule_max_atoms=getattr(config, 'molecule_max_atoms', None),
-            cutoff_distance=getattr(config, 'cutoff_distance', 5.0),
-            max_neighbors=getattr(config, 'max_neighbors', 32),
-            transform=transforms
-        )
-    else:
-        raise ValueError(f"Unsupported dataset: {dataset_name}")
+    # AUTO-DETECT CHUNKED DATASETS
+    dataset_dir_path = Path(dataset_dir)
+    parent_dir = dataset_dir_path.parent
+    base_name = dataset_dir_path.name
     
-    return full_dataset
+    # Look for chunk directories: e.g., processed_graphs_40k_chunk_0, processed_graphs_40k_chunk_1, ...
+    chunk_dirs = sorted(list(parent_dir.glob(f"{base_name}_chunk_*")))
+    
+    if chunk_dirs:
+        print(f"📦 Detected {len(chunk_dirs)} chunked datasets")
+        print(f"📦 Using LazyUniversalDataset for memory-efficient loading...")
+        
+        from data_loading.lazy_universal_dataset import LazyUniversalDataset
+        
+        # Collect all .pt files from chunks
+        chunk_pt_files = []
+        for chunk_dir in chunk_dirs:
+            # Find the processed .pt file
+            processed_dir = chunk_dir / "processed"
+            if processed_dir.exists():
+                pt_files = list(processed_dir.glob("*.pt"))
+                # Filter out pre_filter.pt and pre_transform.pt
+                pt_files = [f for f in pt_files if 'pre_filter' not in f.name and 'pre_transform' not in f.name]
+                if pt_files:
+                    chunk_pt_files.append(str(pt_files[0]))
+                    print(f"   ✓ {chunk_dir.name}: {pt_files[0].name}")
+        
+        if not chunk_pt_files:
+            raise FileNotFoundError(f"No processed .pt files found in chunk directories")
+        
+        # Create LazyUniversalDataset
+        full_dataset = LazyUniversalDataset(
+            chunk_pt_files=chunk_pt_files,
+            transform=transforms,
+            max_cache_chunks=3,  # Keep 3 chunks in RAM (~1.5GB)
+            verbose=True
+        )
+        
+        print(f"✅ LazyDataset loaded: {len(full_dataset):,} total samples")
+        return full_dataset
+    
+    else:
+        # SINGLE DATASET (original behavior)
+        print(f"📦 Loading single dataset from: {dataset_dir}")
+        
+        if dataset_name.upper() == 'QM9':
+            max_samples = getattr(config, 'max_samples', 50000)
+            print(f"📊 Loading {max_samples:,} samples from universal cache...")
+            
+            full_dataset = OptimizedUniversalQM9Dataset(
+                root=dataset_dir,
+                universal_cache_path=getattr(config, 'universal_cache_path', None),
+                max_samples=max_samples,
+                molecule_max_atoms=getattr(config, 'molecule_max_atoms', None),
+                cutoff_distance=getattr(config, 'cutoff_distance', 5.0),
+                max_neighbors=getattr(config, 'max_neighbors', 32),
+                transform=transforms
+            )
+            
+        elif dataset_name.upper() == 'LBA':
+            from data_loading.cache_to_pyg import OptimizedUniversalLBADataset
+            max_samples = getattr(config, 'max_samples', 50000)
+            print(f"📊 Loading {max_samples:,} samples from universal cache...")
+            
+            full_dataset = OptimizedUniversalLBADataset(
+                root=dataset_dir,
+                universal_cache_path=getattr(config, 'universal_cache_path', None),
+                max_samples=max_samples,
+                molecule_max_atoms=getattr(config, 'molecule_max_atoms', None),
+                cutoff_distance=getattr(config, 'cutoff_distance', 5.0),
+                max_neighbors=getattr(config, 'max_neighbors', 32),
+                transform=transforms
+            )
+            
+        elif dataset_name.upper() == 'PDB':
+            from data_loading.cache_to_pyg import OptimizedUniversalDataset
+            max_samples = getattr(config, 'max_samples', 50000)
+            print(f"📊 Loading {max_samples:,} samples from universal cache...")
+            
+            full_dataset = OptimizedUniversalDataset(
+                root=dataset_dir,
+                universal_cache_path=getattr(config, 'universal_cache_path', None),
+                max_samples=max_samples,
+                molecule_max_atoms=getattr(config, 'molecule_max_atoms', None),
+                cutoff_distance=getattr(config, 'cutoff_distance', 5.0),
+                max_neighbors=getattr(config, 'max_neighbors', 32),
+                transform=transforms
+            )
+        else:
+            raise ValueError(f"Unsupported dataset: {dataset_name}")
+        
+        print(f"✅ Single dataset loaded: {len(full_dataset):,} samples")
+        return full_dataset
 
 
 def create_data_loaders(dataset, config: PretrainingConfig):
