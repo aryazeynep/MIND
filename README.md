@@ -2,7 +2,7 @@
 
 ## About The Project
 
-[cite_start]MIND is a universal foundation model for molecular representation learning, designed to handle diverse biological molecules like DNA, RNA, proteins, and small molecules within a single, unified framework[cite: 1]. [cite_start]The model is built upon a Graph Transformer backbone and is trained using a self-supervised strategy to comprehend the universal principles of 3D molecular structure[cite: 1].
+MIND is a universal foundation model for molecular representation learning, designed to handle diverse biological molecules like DNA, RNA, proteins, and small molecules within a single, unified framework. The model is built upon a Graph Transformer backbone and is trained using a self-supervised strategy to comprehend the universal principles of 3D molecular structure.
 
 This guide explains how to set up the environment and run the complete data processing and pre-training pipeline for the protein dataset.
 
