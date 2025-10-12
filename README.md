@@ -138,7 +138,7 @@ python data_loading/process_chunked_dataset.py \
     --config-yaml-path core/pretraining_config_protein.yaml \
     --data-path data/proteins/raw_structures_hq_40k \
     --manifest-file data/proteins/afdb_clusters/manifest_hq_40k_len512.csv \
-    --num-chunks 2
+    --num-chunks 20
 ```
 After this step, your processed data will be ready in separate chunk directories (e.g., `../data/proteins/processed_graphs_40k_chunk_0/`, `..._chunk_1/`).
 
