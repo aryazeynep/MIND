@@ -230,38 +230,21 @@ class LazyUniversalDataset(Dataset):
     def clear_cache(self):
         """Clear the chunk cache to free memory"""
         self._cache.clear()
-
-
-if __name__ == "__main__":
-    # Simple test
-    print("="*60)
-    print("LazyUniversalDataset - Quick Test")
-    print("="*60)
     
-    # Test with existing processed data
-    test_file = "/home/yusuf/data/proteins/processed_graphs_40k/processed/optimized_universal_pdb_all_samples_40000_cutoff_5.0_neighbors_64.pt"
-    
-    if Path(test_file).exists():
-        print(f"\n✅ Found test file: {Path(test_file).name}")
+    def get_chunk_indices(self, chunk_idx: int) -> List[int]:
+        """
+        Get all global sample indices for a specific chunk.
         
-        dataset = LazyUniversalDataset(
-            chunk_pt_files=[test_file],
-            verbose=True
-        )
+        Used by ChunkAwareSampler to enable sequential chunk reading.
         
-        print(f"\n📊 Dataset info:")
-        print(f"   Length: {len(dataset):,}")
+        Args:
+            chunk_idx: Index of the chunk (0 to num_chunks-1)
+            
+        Returns:
+            List of global sample indices in this chunk
+        """
+        if chunk_idx < 0 or chunk_idx >= len(self.chunk_pt_files):
+            raise IndexError(f"Chunk index {chunk_idx} out of range [0, {len(self.chunk_pt_files)})")
         
-        # Test sample access
-        print(f"\n🔍 Testing sample access...")
-        sample_0 = dataset[0]
-        print(f"   Sample 0: {sample_0.num_nodes} nodes, {sample_0.num_edges} edges")
-        
-        sample_100 = dataset[100]
-        print(f"   Sample 100: {sample_100.num_nodes} nodes, {sample_100.num_edges} edges")
-        
-        print(f"\n✅ All tests passed!")
-    else:
-        print(f"\n⚠️ Test file not found: {test_file}")
-        print("   (This is OK if data hasn't been processed yet)")
-
+        start_idx, end_idx, _ = self.file_ranges[chunk_idx]
+        return list(range(start_idx, end_idx))
