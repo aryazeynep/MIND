@@ -229,25 +229,54 @@ def create_data_loaders(dataset, config: PretrainingConfig):
         )
 
     # Val and test loaders (no shuffling needed, but apply optimizations)
-    val_loader = GeometricDataLoader(
-        val_dataset,
-        batch_size=config.batch_size,
-        shuffle=False,
-        num_workers=config.num_workers,
-        pin_memory=True,
-        persistent_workers=True if config.num_workers > 0 else False,
-        prefetch_factor=2 if config.num_workers > 0 else None
-    )
+    if is_lazy_dataset:
+        # Use ChunkAwareSampler for val/test too (sequential reading, no shuffle)
+        val_sampler = ChunkAwareSampler(
+            val_dataset,
+            shuffle_chunks=False,  # Keep chunk order for validation
+            shuffle_within_chunk=False  # Keep sample order too
+        )
+        
+        val_loader = GeometricDataLoader(
+            val_dataset,
+            batch_size=config.batch_size,
+            sampler=val_sampler,
+            num_workers=config.num_workers,
+            pin_memory=True,
+            persistent_workers=True if config.num_workers > 0 else False,
+            prefetch_factor=2 if config.num_workers > 0 else None
+        )
+        
+        test_sampler = ChunkAwareSampler(
+            test_dataset,
+            shuffle_chunks=False,
+            shuffle_within_chunk=False
+        )
+        
+        test_loader = GeometricDataLoader(
+            test_dataset,
+            batch_size=config.batch_size,
+            sampler=test_sampler,
+            num_workers=config.num_workers,
+            pin_memory=True,
+            persistent_workers=True if config.num_workers > 0 else False,
+            prefetch_factor=2 if config.num_workers > 0 else None
+        )
+    else:
+        # Standard loaders for non-chunked datasets
+        val_loader = GeometricDataLoader(
+            val_dataset,
+            batch_size=config.batch_size,
+            shuffle=False,
+            num_workers=config.num_workers
+        )
 
-    test_loader = GeometricDataLoader(
-        test_dataset,
-        batch_size=config.batch_size,
-        shuffle=False,
-        num_workers=config.num_workers,
-        pin_memory=True,
-        persistent_workers=True if config.num_workers > 0 else False,
-        prefetch_factor=2 if config.num_workers > 0 else None
-    )
+        test_loader = GeometricDataLoader(
+            test_dataset,
+            batch_size=config.batch_size,
+            shuffle=False,
+            num_workers=config.num_workers
+        )
 
     print(f"📊 Data loaders created:")
     print(f"   Train batches: {len(train_loader)}")
