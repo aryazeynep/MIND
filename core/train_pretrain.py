@@ -365,7 +365,7 @@ def train_universal_pretraining(
             mode="min",
             verbose=True,
         ),
-        TQDMProgressBar(refresh_rate=1),
+        TQDMProgressBar(refresh_rate=10),  # Reduce log clutter
         ChunkSamplerEpochCallback(),  # Update chunk sampler each epoch
     ]
     
