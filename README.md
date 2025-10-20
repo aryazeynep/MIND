@@ -125,14 +125,14 @@ python data/protein_pipeline/2_download_pdbs_from_manifest.py \
 
 ### Step 4: Process Data into Scalable Chunks
 
-This is the main data processing step. A new automated script, `process_chunked_dataset.py`, handles the entire memory-intensive conversion. [cite_start]It splits the manifest into smaller parts ("chunks") and processes each one independently to avoid running out of RAM[cite: 14].
+This is the main data processing step. A new automated script, `process_chunked_dataset.py`, handles the entire memory-intensive conversion. It splits the manifest into smaller parts ("chunks") and processes each one independently to avoid running out of RAM.
 
 This script performs two stages for each chunk:
 1.  Converts raw `.pdb` files to the universal `.pkl` format.
 2.  Converts the `.pkl` file to the final, optimized PyTorch Geometric `.pt` format.
 
 ```bash
-# This command processes the 40k manifest into 2 chunks (20k proteins each).
+# This command processes the 40k manifest into 2o chunks (20k proteins each).
 # For 1M proteins, you can increase --num-chunks to 200.
 python data_loading/process_chunked_dataset.py \
     --config-yaml-path core/pretraining_config_protein.yaml \
@@ -144,7 +144,7 @@ After this step, your processed data will be ready in separate chunk directories
 
 ### Step 5: Start Pre-training
 
-Finally, start the training. [cite_start]The training script (`core/train_pretrain.py`) is designed to automatically detect the chunked dataset directories and load the data efficiently using the `LazyUniversalDataset`[cite: 18].
+Finally, start the training. The training script (`core/train_pretrain.py`) is designed to automatically detect the chunked dataset directories and load the data efficiently using the `LazyUniversalDataset`.
 
 We use `nohup` to ensure the training continues even if your SSH connection is lost.
 
