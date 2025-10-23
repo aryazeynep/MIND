@@ -1,9 +1,9 @@
 seed: 42
 dataset: COCONUT
-dataset_download_dir: ./data
+dataset_download_dir: ./data/COCONUT
 out_path: ./outputs/universal_pretrain_coconut
 wandb_project_name: esa-universal-pretraining
-wandb_run_name: universal-COCONUT-pretraining
+wandb_run_name: new-universal-COCONUT-pretraining
 max_epochs: 100
 gradient_clip_val: 0.5
 monitor_loss_name: train_total_loss
@@ -13,7 +13,7 @@ molecule_max_atoms: 150  # Very conservative limit for COCONUT natural products
 
 # Universal representation specific settings
 use_universal_cache: true
-universal_cache_path: "./data_loading/cache/universal_coconut_100000.pkl"
+universal_cache_path: "./data_loading/cache/universal_coconut_1000.pkl"
 
 apply_attention_on: node
 graph_dim: 512
@@ -91,7 +91,7 @@ optimiser_weight_decay: 0.0000000001  # Match working model exactly
 batch_size: 3072
 
 # Dataset size limit (large natural products database)
-max_samples: 100000  # Scaled up for more comprehensive training
+max_samples: 1000  # Scaled up for more comprehensive training
 
 # Memory efficient settings
 use_memory_efficient_attention: true

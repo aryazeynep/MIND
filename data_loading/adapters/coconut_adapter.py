@@ -75,7 +75,7 @@ class COCONUTAdapter(BaseAdapter):
         try:
             from rdkit import Chem
             
-            sdf_path = os.path.join(data_path, "COCONUT", "coconut_sdf_3d-09-2025.sdf")
+            sdf_path = os.path.join(data_path, "COCONUT", "coconut_sdf_3d-10-2025.sdf")
             
             if not os.path.exists(sdf_path):
                 raise FileNotFoundError(f"COCONUT SDF file not found: {sdf_path}")
@@ -86,7 +86,7 @@ class COCONUTAdapter(BaseAdapter):
             suppl = Chem.SDMolSupplier(sdf_path, removeHs=False, sanitize=False)
             
             samples = []
-            total_molecules = 695112  # From our previous count
+            total_molecules = 696466  # From our previous count
             skipped_count = 0
             
             print(f"Processing COCONUT molecules (total: ~{total_molecules})...")

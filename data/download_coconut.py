@@ -8,6 +8,7 @@ compounds from various sources.
 
 Reference: https://coconut.naturalproducts.net/
 Dataset URL: https://coconut.s3.uni-jena.de/prod/downloads/2025-09/coconut_sdf_3d-09-2025.zip
+new url: https://coconut.s3.uni-jena.de/prod/downloads/2025-10/coconut_sdf_3d-10-2025.zip
 """
 
 import os
@@ -16,13 +17,13 @@ import zipfile
 from pathlib import Path
 
 DOWNLOAD_DIR = "./data/COCONUT"
-DOWNLOAD_URL = "https://coconut.s3.uni-jena.de/prod/downloads/2025-09/coconut_sdf_3d-09-2025.zip"
+DOWNLOAD_URL = "https://coconut.s3.uni-jena.de/prod/downloads/2025-10/coconut_sdf_3d-10-2025.zip"
 
 def download_coconut():
     """Download COCONUT dataset."""
     os.makedirs(DOWNLOAD_DIR, exist_ok=True)
     
-    zip_file = os.path.join(DOWNLOAD_DIR, "coconut_sdf_3d-09-2025.zip")
+    zip_file = os.path.join(DOWNLOAD_DIR, "coconut_sdf_3d-10-2025.zip")
     
     print(f"Downloading COCONUT dataset to {DOWNLOAD_DIR}...")
     print(f"Source: {DOWNLOAD_URL}")
