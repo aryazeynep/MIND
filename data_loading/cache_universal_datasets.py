@@ -3,7 +3,7 @@
 Universal Dataset Caching System
 
 Caches universal representations for any dataset using the adapter system.
-This script can cache QM9, LBA, PDB, or any future dataset adapters.
+This script can cache QM9, LBA, COCONUT, PDB, or any future dataset adapters.
 
 Usage:
     # Process the first 1000 samples of the QM9 dataset using default paths
@@ -19,6 +19,9 @@ Usage:
     python data_loading/cache_universal_datasets.py --dataset pdb \
       --data-path ../data/proteins/raw_structures_hq_40k \
       --cache-dir ../data/proteins/cache
+
+    # Process COCONUT dataset
+    python data_loading/cache_universal_datasets.py --dataset coconut --max_samples 1000
 
     # List all caches in a specific directory
     python data_loading/cache_universal_datasets.py --list --cache-dir ../data/proteins/cache
@@ -41,6 +44,9 @@ def get_adapter(dataset_name: str):
     elif dataset_name.lower() == 'lba':
         from data_loading.adapters.lba_adapter import LBAAdapter
         return LBAAdapter(), './data/LBA'
+    elif dataset_name.lower() == 'coconut':
+        from data_loading.adapters.coconut_adapter import COCONUTAdapter
+        return COCONUTAdapter(), './data'
     elif dataset_name.lower() == 'pdb':
         from data_loading.adapters.protein_adapter import ProteinAdapter
         # This is just a default path if the user does not provide one.
@@ -198,14 +204,16 @@ def main():
     """Main function"""
     parser = argparse.ArgumentParser(description='Cache universal representations for datasets.')
     
+    # Add coconut to the list of choices from the old branch
     parser.add_argument(
         '--dataset', 
         type=str, 
         required=True, 
-        choices=['qm9', 'lba', 'pdb', 'all'],
+        choices=['qm9', 'lba', 'coconut', 'pdb', 'all'],
         help='Dataset to cache.'
     )
     
+    # Keep the flexible path arguments from main
     parser.add_argument(
         '--data-path', 
         type=Path, 
@@ -271,8 +279,8 @@ def main():
         print(f"❌ Error: --chunk-index must be < --num-chunks (got {args.chunk_index} >= {args.num_chunks})")
         return 1
     
-    # The 'all' option is simplified for now.
-    datasets_to_process = ['qm9', 'lba', 'pdb'] if args.dataset == 'all' else [args.dataset]
+    # The 'all' option includes coconut now.
+    datasets_to_process = ['qm9', 'lba', 'coconut', 'pdb'] if args.dataset == 'all' else [args.dataset]
     
     success_all = True
     for ds_name in datasets_to_process:

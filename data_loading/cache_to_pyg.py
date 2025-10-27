@@ -292,6 +292,42 @@ class OptimizedUniversalLBADataset(OptimizedUniversalDataset):
                         transform, pre_transform, pre_filter)
 
 
+class OptimizedUniversalCOCONUTDataset(OptimizedUniversalDataset):
+    """
+    COCONUT Dataset using cached PyTorch Geometric tensors
+    
+    This specialized dataset class for COCONUT provides instant loading by caching
+    converted PyTorch Geometric tensors, eliminating the conversion bottleneck.
+    """
+    
+    def __init__(self, 
+                 root: str = None,
+                 universal_cache_path: str = None,
+                 max_samples: Optional[int] = None,
+                 cutoff_distance: float = 5.0,
+                 max_neighbors: int = 32,
+                 transform=None,
+                 pre_transform=None,
+                 pre_filter=None):
+        
+        # Default root path
+        if root is None:
+            root = os.path.join(
+                os.path.dirname(__file__), 
+                'processed', 'coconut_optimized'
+            )
+        
+        # Default cache path for COCONUT
+        if universal_cache_path is None:
+            universal_cache_path = os.path.join(
+                os.path.dirname(__file__), 
+                'cache', 'universal_coconut_all.pkl'
+            )
+        
+        super().__init__(root, universal_cache_path, max_samples, cutoff_distance, max_neighbors, 
+                        transform, pre_transform, pre_filter)
+
+
 if __name__ == "__main__":
     import argparse
     import sys
@@ -299,7 +335,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Convert universal .pkl cache to PyG .pt format")
     parser.add_argument("--input-pkl", required=True, help="Path to input .pkl file")
     parser.add_argument("--output-dir", required=True, help="Output directory for .pt file")
-    parser.add_argument("--dataset-type", choices=["qm9", "lba", "pdb"], required=True, help="Dataset type")
+    parser.add_argument("--dataset-type", choices=["qm9", "lba", "pdb", "coconut"], required=True, help="Dataset type")
     parser.add_argument("--max-samples", type=int, default=None, help="Maximum samples to process")
     parser.add_argument("--cutoff", type=float, default=5.0, help="Distance cutoff for edges (Å)")
     parser.add_argument("--max-neighbors", type=int, default=64, help="Maximum neighbors per atom")
@@ -347,3 +383,12 @@ if __name__ == "__main__":
             max_neighbors=args.max_neighbors
         )
         print(f"✅ Created PDB dataset: {len(dataset)} samples")
+    elif args.dataset_type == "coconut":
+        dataset = OptimizedUniversalCOCONUTDataset(
+            root=args.output_dir,
+            universal_cache_path=args.input_pkl,
+            max_samples=args.max_samples,
+            cutoff_distance=args.cutoff,
+            max_neighbors=args.max_neighbors
+        )
+        print(f"✅ Created COCONUT dataset: {len(dataset)} samples")
